@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeatherSense-VAD | Anomaly Detection Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d28;
+            --bg-card: #21242f;
+            --bg-hover: #2a2d3a;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --accent: #6c63ff;
+            --accent-hover: #5a52d5;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --info: #60a5fa;
+            --border: #2d3140;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ---- Top Nav ---- */
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .navbar .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        .navbar .brand i { color: var(--accent); font-size: 22px; }
+        .navbar .brand span.sub { font-weight: 300; color: var(--text-secondary); font-size: 13px; }
+        .nav-status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            display: inline-block;
+            margin-right: 4px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ---- Layout ---- */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 32px;
+        }
+
+        /* ---- Upload Section ---- */
+        .upload-section {
+            background: var(--bg-card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 48px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 24px;
+        }
+        .upload-section:hover, .upload-section.dragover {
+            border-color: var(--accent);
+            background: rgba(108, 99, 255, 0.05);
+        }
+        .upload-section i { font-size: 48px; color: var(--accent); margin-bottom: 16px; }
+        .upload-section h3 { font-size: 18px; margin-bottom: 8px; }
+        .upload-section p { color: var(--text-secondary); font-size: 14px; }
+        .upload-section input[type="file"] { display: none; }
+
+        /* ---- Grid ---- */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+
+        @media (max-width: 1024px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .grid-4 { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ---- Cards ---- */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title i { color: var(--accent); }
+
+        /* ---- Stat Boxes ---- */
+        .stat-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-box .stat-icon { font-size: 24px; margin-bottom: 8px; }
+        .stat-box .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+        .stat-box .stat-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ---- Image Compare ---- */
+        .image-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .image-box {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/10;
+        }
+        .image-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .image-box .label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* ---- Weather Bars ---- */
+        .weather-item {
+            margin-bottom: 14px;
+        }
+        .weather-item .weather-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        .weather-item .weather-label span:last-child { font-weight: 600; }
+        .bar-track {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s ease;
+        }
+        .bar-fill.fog { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
+        .bar-fill.lowlight { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .bar-fill.rain { background: linear-gradient(90deg, #34d399, #10b981); }
+        .bar-fill.visibility { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+
+        /* ---- Badge ---- */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-normal { background: rgba(52,211,153,0.15); color: var(--success); }
+        .badge-anomaly { background: rgba(248,113,113,0.15); color: var(--danger); }
+        .badge-warning { background: rgba(251,191,36,0.15); color: var(--warning); }
+        .badge-info { background: rgba(96,165,250,0.15); color: var(--info); }
+
+        /* ---- Score Gauge ---- */
+        .gauge-container { text-align: center; padding: 10px 0; }
+        .gauge-value {
+            font-size: 56px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gauge-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* ---- Scene Tags ---- */
+        .scene-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin: 4px;
+        }
+        .scene-tag .conf { color: var(--accent); font-weight: 600; }
+
+        /* ---- Explanation ---- */
+        .explanation-box {
+            background: var(--bg-primary);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 16px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        /* ---- Timeline ---- */
+        .timeline-bar {
+            width: 100%;
+            height: 40px;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .timeline-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            transition: all 0.3s;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .timeline-segment:hover { opacity: 1; transform: scaleY(1.1); }
+        .timeline-segment.normal { background: var(--success); }
+        .timeline-segment.anomaly { background: var(--danger); }
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* ---- Metrics Table ---- */
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .metrics-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .metrics-table td:first-child { color: var(--text-secondary); }
+        .metrics-table td:last-child { text-align: right; font-weight: 600; }
+
+        /* ---- Tabs ---- */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ---- Buttons ---- */
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border); }
+
+        /* ---- Loading ---- */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,17,23,0.85);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .loading-overlay.show { display: flex; }
+        .spinner {
+            width: 48px; height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---- Results hidden by default ---- */
+        #results-section { display: none; }
+        #results-section.show { display: block; }
+
+        /* ---- Heatmap overlay ---- */
+        .heatmap-container { position: relative; }
+        .heatmap-container .heatmap-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.6;
+            mix-blend-mode: screen;
+        }
+        .heatmap-container .heatmap-overlay img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title i { color: var(--accent); }
+        .divider { height: 1px; background: var(--border); margin: 32px 0; }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="brand">
+        <i class="fas fa-shield-alt"></i>
+        WeatherSense-VAD
+        <span class="sub">| Video Anomaly Detection</span>
+    </div>
+    <div class="nav-status">
+        <span><span class="status-dot"></span> System Ready</span>
+        <span>CPU Mode</span>
+    </div>
+</nav>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div style="font-size:14px; color: var(--text-secondary);">Analyzing...</div>
+</div>
+
+<div class="container">
+
+    <!-- Upload -->
+    <div class="upload-section" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <h3>Upload Surveillance Image or Video</h3>
+        <p>Drag & drop or click to browse — supports JPG, PNG, MP4</p>
+        <input type="file" id="file-input" accept="image/*,video/mp4">
+    </div>
+
+    <!-- Demo button -->
+    <div style="text-align:center; margin-bottom:24px;">
+        <button class="btn btn-secondary" onclick="runDemo()">
+            <i class="fas fa-play-circle"></i> Run Demo with Sample Data
+        </button>
+    </div>
+
+    <!-- =========== RESULTS =========== -->
+    <div id="results-section">
+
+        <!-- Stat Cards -->
+        <div class="grid-4">
+            <div class="stat-box">
+                <div class="stat-icon">🌤️</div>
+                <div class="stat-value" id="s-visibility">--</div>
+                <div class="stat-label">Visibility Quality</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">📍</div>
+                <div class="stat-value" id="s-scene">--</div>
+                <div class="stat-label">Scene Type</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-value" id="s-anomaly-score">--</div>
+                <div class="stat-label">Anomaly Score</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-value" id="s-verdict">--</div>
+                <div class="stat-label">Verdict</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('tab-overview')">Overview</button>
+            <button class="tab-btn" onclick="switchTab('tab-weather')">Weather Analysis</button>
+            <button class="tab-btn" onclick="switchTab('tab-anomaly')">Anomaly Detection</button>
+            <button class="tab-btn" onclick="switchTab('tab-explain')">Explainability</button>
+            <button class="tab-btn" onclick="switchTab('tab-metrics')">Metrics</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="grid-2">
+                <!-- Image comparison -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-images"></i> Visual Comparison</div>
+                    </div>
+                    <div class="image-compare">
+                        <div class="image-box">
+                            <img id="img-original" src="" alt="Original">
+                            <div class="label">Original</div>
+                        </div>
+                        <div class="image-box">
+                            <img id="img-enhanced" src="" alt="Enhanced">
+                            <div class="label" style="background:rgba(108,99,255,0.8);">Enhanced</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipeline Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-project-diagram"></i> Pipeline Summary</div>
+                    </div>
+                    <div id="pipeline-steps" style="font-size:14px; line-height: 2.2;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Weather -->
+        <div class="tab-content" id="tab-weather">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-cloud-sun"></i> Weather Conditions</div>
+                    </div>
+                    <div id="weather-bars"></div>
+                    <div style="margin-top:16px;">
+                        <span class="card-title" style="margin-bottom:8px; display:block;">
+                            <i class="fas fa-magic"></i> Applied Enhancement
+                        </span>
+                        <div id="enhancement-method"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-images"></i> Before / After</div>
+                    </div>
+                    <div class="image-compare">
+                        <div class="image-box">
+                            <img id="img-original2" src="" alt="Original">
+                            <div class="label">Before</div>
+                        </div>
+                        <div class="image-box">
+                            <img id="img-enhanced2" src="" alt="Enhanced">
+                            <div class="label" style="background:rgba(52,211,153,0.8);">After</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Anomaly -->
+        <div class="tab-content" id="tab-anomaly">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-chart-line"></i> Anomaly Score</div>
+                    </div>
+                    <div class="gauge-container">
+                        <div class="gauge-value" id="anomaly-gauge">0.00</div>
+                        <div class="gauge-label">Anomaly Score (higher = more anomalous)</div>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <table class="metrics-table">
+                            <tr><td>Threshold</td><td id="a-threshold">--</td></tr>
+                            <tr><td>Scene Context</td><td id="a-scene-ctx">--</td></tr>
+                            <tr><td>Time Context</td><td id="a-time-ctx">--</td></tr>
+                            <tr><td>Confidence</td><td id="a-confidence">--</td></tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-stream"></i> Clip Timeline</div>
+                    </div>
+                    <div class="timeline-bar" id="timeline-bar"></div>
+                    <div class="timeline-labels">
+                        <span>Clip 0</span><span id="timeline-end">Clip 21</span>
+                    </div>
+                    <div style="margin-top:16px; display:flex; gap:16px; font-size:13px;">
+                        <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--success);margin-right:4px;vertical-align:middle;"></span> Normal</span>
+                        <span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:var(--danger);margin-right:4px;vertical-align:middle;"></span> Anomaly</span>
+                    </div>
+                    <div style="margin-top:20px;">
+                        <div class="card-title" style="margin-bottom:8px;">
+                            <i class="fas fa-list"></i> Scene Classification
+                        </div>
+                        <div id="scene-tags"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Explainability -->
+        <div class="tab-content" id="tab-explain">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-fire"></i> Grad-CAM Heatmap</div>
+                    </div>
+                    <div class="image-box" style="aspect-ratio:16/10;">
+                        <img id="img-heatmap" src="" alt="Heatmap">
+                        <div class="label" style="background:rgba(248,113,113,0.8);">Attention Map</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-comment-alt"></i> Reasoning</div>
+                    </div>
+                    <div class="explanation-box" id="explanation-text">
+                        Waiting for analysis...
+                    </div>
+                    <div style="margin-top:20px;">
+                        <div class="card-title" style="margin-bottom:8px;">
+                            <i class="fas fa-list-check"></i> Contributing Factors
+                        </div>
+                        <div id="factors-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Metrics -->
+        <div class="tab-content" id="tab-metrics">
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-chart-bar"></i> Detection Metrics</div>
+                    </div>
+                    <table class="metrics-table" id="detection-metrics"></table>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-brain"></i> Continual Learning</div>
+                    </div>
+                    <table class="metrics-table" id="cl-metrics"></table>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-cog"></i> System Info</div>
+                    </div>
+                    <table class="metrics-table" id="system-info"></table>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- /results-section -->
+</div> <!-- /container -->
+
+<script>
+// ---- Tab switching ----
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// ---- File upload ----
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    showLoading();
+    fetch('/api/analyze', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => { hideLoading(); renderResults(data); })
+        .catch(err => { hideLoading(); alert('Error: ' + err.message); });
+}
+
+// ---- Demo ----
+function runDemo() {
+    showLoading();
+    fetch('/api/demo')
+        .then(r => r.json())
+        .then(data => { hideLoading(); renderResults(data); })
+        .catch(err => { hideLoading(); alert('Error: ' + err.message); });
+}
+
+function showLoading() { document.getElementById('loading').classList.add('show'); }
+function hideLoading() { document.getElementById('loading').classList.remove('show'); }
+
+// ---- Render results ----
+function renderResults(data) {
+    document.getElementById('results-section').classList.add('show');
+
+    // Stat cards
+    document.getElementById('s-visibility').textContent = (data.weather.visibility_quality * 100).toFixed(0) + '%';
+    document.getElementById('s-scene').textContent = data.scene.top_scene;
+    document.getElementById('s-anomaly-score').textContent = data.anomaly.score.toFixed(2);
+    const verdict = data.anomaly.is_anomaly ? 'ANOMALY' : 'NORMAL';
+    const verdictEl = document.getElementById('s-verdict');
+    verdictEl.textContent = verdict;
+    verdictEl.style.color = data.anomaly.is_anomaly ? 'var(--danger)' : 'var(--success)';
+
+    // Images
+    if (data.images) {
+        ['img-original', 'img-original2'].forEach(id =>
+            document.getElementById(id).src = 'data:image/jpeg;base64,' + data.images.original);
+        ['img-enhanced', 'img-enhanced2'].forEach(id =>
+            document.getElementById(id).src = 'data:image/jpeg;base64,' + data.images.enhanced);
+        if (data.images.heatmap) {
+            document.getElementById('img-heatmap').src = 'data:image/jpeg;base64,' + data.images.heatmap;
+        }
+    }
+
+    // Pipeline steps
+    const steps = data.pipeline_steps || [];
+    document.getElementById('pipeline-steps').innerHTML = steps.map((s, i) =>
+        `<div style="display:flex;align-items:center;gap:10px;">
+            <span style="background:var(--accent);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">${i+1}</span>
+            <span>${s.name}</span>
+            <span class="badge ${s.status === 'done' ? 'badge-normal' : 'badge-info'}" style="margin-left:auto;">${s.status}</span>
+        </div>`
+    ).join('');
+
+    // Weather bars
+    const wb = data.weather;
+    document.getElementById('weather-bars').innerHTML = [
+        { label: 'Fog / Haze', value: wb.fog_score, cls: 'fog' },
+        { label: 'Low Light', value: wb.low_light_score, cls: 'lowlight' },
+        { label: 'Rain', value: wb.rain_score, cls: 'rain' },
+        { label: 'Visibility', value: wb.visibility_quality, cls: 'visibility' },
+    ].map(w =>
+        `<div class="weather-item">
+            <div class="weather-label"><span>${w.label}</span><span>${(w.value*100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill ${w.cls}" style="width:${w.value*100}%"></div></div>
+        </div>`
+    ).join('');
+
+    document.getElementById('enhancement-method').innerHTML =
+        (wb.applied_enhancement || ['none']).map(m =>
+            `<span class="badge badge-info" style="margin-right:6px;">${m}</span>`).join('');
+
+    // Anomaly details
+    document.getElementById('anomaly-gauge').textContent = data.anomaly.score.toFixed(2);
+    document.getElementById('anomaly-gauge').style.background =
+        data.anomaly.is_anomaly
+            ? 'linear-gradient(135deg, #f87171, #ef4444)'
+            : 'linear-gradient(135deg, #6c63ff, #a78bfa)';
+    document.getElementById('anomaly-gauge').style['-webkit-background-clip'] = 'text';
+
+    document.getElementById('a-threshold').textContent = data.anomaly.threshold.toFixed(2);
+    document.getElementById('a-scene-ctx').textContent = data.scene.top_scene;
+    document.getElementById('a-time-ctx').textContent = data.temporal.time_context;
+    document.getElementById('a-confidence').textContent = (data.anomaly.confidence * 100).toFixed(1) + '%';
+
+    // Timeline
+    const clips = data.anomaly.clip_scores || [];
+    const tb = document.getElementById('timeline-bar');
+    tb.innerHTML = '';
+    if (clips.length) {
+        const w = 100 / clips.length;
+        clips.forEach((c, i) => {
+            const seg = document.createElement('div');
+            seg.className = 'timeline-segment ' + (c.is_anomaly ? 'anomaly' : 'normal');
+            seg.style.left = (i * w) + '%';
+            seg.style.width = w + '%';
+            seg.title = `Clip ${i}: ${c.score.toFixed(2)}`;
+            tb.appendChild(seg);
+        });
+        document.getElementById('timeline-end').textContent = 'Clip ' + (clips.length - 1);
+    }
+
+    // Scene tags
+    const tags = data.scene.classifications || [];
+    document.getElementById('scene-tags').innerHTML = tags.map(t =>
+        `<span class="scene-tag">${t.label} <span class="conf">${(t.score*100).toFixed(0)}%</span></span>`
+    ).join('');
+
+    // Explanation
+    document.getElementById('explanation-text').innerHTML = data.explanation.text;
+    const factors = data.explanation.factors || [];
+    document.getElementById('factors-list').innerHTML = factors.map(f =>
+        `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;">
+            <span style="color:${f.impact === 'high' ? 'var(--danger)' : f.impact === 'medium' ? 'var(--warning)' : 'var(--success)'};font-size:18px;">●</span>
+            <span>${f.description}</span>
+            <span class="badge badge-${f.impact === 'high' ? 'anomaly' : f.impact === 'medium' ? 'warning' : 'normal'}" style="margin-left:auto;">${f.impact}</span>
+        </div>`
+    ).join('');
+
+    // Detection metrics
+    const dm = data.metrics;
+    document.getElementById('detection-metrics').innerHTML = [
+        ['ROC-AUC', dm.roc_auc],
+        ['Precision', dm.precision],
+        ['Recall', dm.recall],
+        ['F1-Score', dm.f1_score],
+        ['Avg Precision', dm.avg_precision],
+    ].map(r => `<tr><td>${r[0]}</td><td>${typeof r[1]==='number' ? (r[1]*100).toFixed(1)+'%' : r[1]}</td></tr>`).join('');
+
+    // CL metrics
+    document.getElementById('cl-metrics').innerHTML = [
+        ['LoRA Rank', data.continual.lora_rank],
+        ['EWC Lambda', data.continual.ewc_lambda],
+        ['Adaptation Status', data.continual.status],
+        ['Scenes Learned', data.continual.scenes_learned],
+    ].map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+
+    // System info
+    document.getElementById('system-info').innerHTML = [
+        ['Device', data.system.device],
+        ['Backbone', data.system.backbone],
+        ['Feature Dim', data.system.feature_dim],
+        ['Processing Time', data.system.processing_time],
+    ].map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+}
+</script>
+
+</body>
+</html>

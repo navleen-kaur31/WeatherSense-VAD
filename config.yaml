@@ -1,0 +1,169 @@
+# WeatherSense-VAD Configuration
+# Weather-Robust, Context-Aware and Continually Adaptive
+# Video Anomaly Detection System
+
+system:
+  name: "WeatherSense-VAD"
+  version: "0.1.0"
+  device: "auto"  # auto, cpu, cuda
+  seed: 42
+
+# ============================================================
+# Data Configuration
+# ============================================================
+data:
+  root_dir: "data/shanghaitech"
+  sequences_dir: "data/sequences"
+  gt_mask_dir: "data/shanghaitech/gt/test_frame_mask"
+  pose_dir: "data/shanghaitech/pose/test"
+  
+  # Temporal windowing
+  sequence_length: 16
+  stride: 8
+  image_size: 224
+
+# ============================================================
+# Weather Preprocessing
+# ============================================================
+weather:
+  # Weather condition assessment
+  assessment:
+    enabled: true
+    fog_threshold: 0.5
+    low_light_threshold: 0.3
+    rain_threshold: 0.4
+
+  # Zero-DCE (Low-light enhancement)
+  zero_dce:
+    enabled: true
+    model_path: "preprocessing/outputs/zero_dce/zero_dce_model.pth"
+    enhancement_iterations: 8
+    
+  # AOD-Net (Dehazing)
+  aod_net:
+    enabled: true
+    model_path: "checkpoints/aod_net.pth"
+
+# ============================================================
+# Scene Understanding (CLIP)
+# ============================================================
+scene:
+  clip:
+    enabled: true
+    model_name: "openai/clip-vit-base-patch32"
+    scene_categories:
+      - "indoor corridor"
+      - "outdoor street"
+      - "parking lot"
+      - "campus walkway"
+      - "building entrance"
+      - "plaza or open area"
+      - "staircase"
+      - "road intersection"
+
+# ============================================================
+# Temporal Context
+# ============================================================
+temporal:
+  enabled: true
+  time_embedding_dim: 32
+  use_cyclical_encoding: true
+  
+# ============================================================
+# Feature Extraction
+# ============================================================
+features:
+  backbone: "swin3d_t"  # Video Swin Transformer Tiny
+  feature_dim: 768
+  batch_size: 2
+  
+  output_dir: "outputs/features"
+
+# ============================================================
+# Anomaly Detection
+# ============================================================
+anomaly:
+  # Scoring methods
+  euclidean:
+    enabled: true
+  mahalanobis:
+    enabled: true
+    n_components: 10
+  
+  # Context-aware scoring
+  context_aware:
+    enabled: true
+    scene_weight: 0.3
+    temporal_weight: 0.2
+    visual_weight: 0.5
+  
+  # Threshold
+  threshold_method: "adaptive"  # fixed, adaptive, percentile
+  threshold_sigma: 2.0
+  
+  output_dir: "outputs/scores"
+
+# ============================================================
+# Cold-Start Calibration
+# ============================================================
+cold_start:
+  enabled: true
+  calibration_frames: 100
+  min_confidence: 0.7
+  warmup_epochs: 5
+
+# ============================================================
+# Continual Learning
+# ============================================================
+continual_learning:
+  # LoRA
+  lora:
+    enabled: true
+    rank: 8
+    alpha: 16
+    dropout: 0.1
+    target_modules: ["qkv", "proj"]
+    
+  # EWC
+  ewc:
+    enabled: true
+    lambda_ewc: 1000.0
+    fisher_samples: 200
+
+# ============================================================
+# Explainability
+# ============================================================
+explainability:
+  # Grad-CAM
+  grad_cam:
+    enabled: true
+    target_layer: "model.features"  # Last feature layer
+    
+  # Reasoning
+  reasoning:
+    enabled: true
+    generate_text: true
+    generate_heatmap: true
+
+# ============================================================
+# Evaluation
+# ============================================================
+evaluation:
+  metrics:
+    - "roc_auc"
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "average_precision"
+  
+  output_dir: "outputs/evaluation"
+
+# ============================================================
+# Dashboard
+# ============================================================
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  upload_dir: "uploads"
+  results_dir: "outputs/dashboard"
